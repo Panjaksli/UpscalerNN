@@ -1,12 +1,12 @@
 # ZPO Projekt - Upscalování obrazu (backend)
-Autor: Ondřej Áč (xacond00)
-Založeno na vlastní NN knihovně: https://github.com/Panjaksli/BNN, implementován Lanczos algoritmus, inferenční kód a pár nových funkcí.
+Autor: Ondřej Áč (xacond00)  
+Založeno na vlastní NN knihovně: https://github.com/Panjaksli/BNN, implementován Lanczos algoritmus, inferenční kód a pár nových funkcí.  
 ## Použití k upscalování
-1) Stáhnout release
-2) Spuštení programu s CLI: `Upscaler.exe img1 img2 ... imgN`
-3) Ukládá stejnojmenné 2x zvětšené obrázky pomocí různých upscalovacích algoritmů s novými příponami např. "_lin.png" v tomto pořadí: Nearest, Bilinear, Bicubic, Lanczos, CNN
+1) Stáhnout release  
+2) Spuštení programu s CLI: `Upscaler.exe img1 img2 ... imgN`  
+3) Ukládá stejnojmenné 2x zvětšené obrázky pomocí různých upscalovacích algoritmů s novými příponami např. "_lin.png" v tomto pořadí: Nearest, Bilinear, Bicubic, Lanczos, CNN  
 
-Původní návod k použití knihovny pro trenování:
+Původní návod k použití knihovny pro trenování:  
 ## Interface
 The interface is as simple as possible - create vector<Layer> and push input, hidden layers and output, create optimizer and then pass both to the network, it manages the given memory itself **(dont delete anything manually!)**.
 ```cpp
