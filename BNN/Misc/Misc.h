@@ -19,6 +19,27 @@ namespace BNN {
 	using std::vector;
 	using std::min;
 	using std::max;
+	inline float fast_sin(float x) {
+		float x2 = x * x;
+		return x + x * x2 * (-1.6666656684e-1f + x2 * (8.3330251389e-3f + x2 * (-1.9807418727e-4f + x2 * 2.6019030676e-6f)));
+	}
+	inline float mod(float u, float v) {
+		return u - v * floorf(u / v);
+	}
+	inline float fsin(float x) {
+		constexpr float pi = 3.1415926535;
+		constexpr float pi2 = 2.0 * 3.1415926535;
+		constexpr float hpi = 0.5 * 3.1415926535;
+		x = mod(x - hpi, pi2);
+		x = fabsf(x - pi) - hpi;
+		return fast_sin(x);
+	}
+	inline float sinc(float x) {
+		return fsin(x) / x;
+	}
+	inline float nsinc(float x) {
+		return sinc(x * 3.1415926535);
+	}
 	template <class T>
 	inline T clamp(const T& x, const T& _min, const T& _max) {
 		return min(max(x, _min), _max);
@@ -28,11 +49,11 @@ namespace BNN {
 		return (1 - t) * x + t * y;
 	}
 	template <class T>
-	inline T cerp(T* p, T x) {
+	inline T cerp(const T* p, T x) {
 		return p[1] + 0.5 * x * (p[2] - p[0] + x * (2.0 * p[0] - 5.0 * p[1] + 4.0 * p[2] - p[3] + x * (3.0 * (p[1] - p[2]) + p[3] - p[0])));
 	}
 	template <class T>
-	inline T bicerp(T* p, T x, T y) {
+	inline T bicerp(const T* p, T x, T y) {
 		T tmp[4];
 		tmp[0] = cerp(p, x);
 		tmp[1] = cerp(p + 4, x);
@@ -40,10 +61,26 @@ namespace BNN {
 		tmp[3] = cerp(p + 12, x);
 		return cerp(tmp, y);
 	}
+	
+	inline float lanc3(float x) {
+		return abs(x) < 3.f ? nsinc(x) * nsinc(x * (1.f / 3.f)) : 0.f;
+	}
+
+	template <class T>
+	inline T lanczos3(const T* p, T x0, T y0) {
+		float res = 0;
+		for(int y = 0; y < 6; y++) {
+			for(int x = 0; x < 6; x++) {
+				res += lanc3(y - 3 + y0) * lanc3(x - 3 + x0) * p[y * 7 + x];
+			}
+		}
+		return res;
+	}
 	enum Interpol {
 		Nearest,
 		Linear,
-		Cubic
+		Cubic,
+		Lanczos
 	};
 	inline const char* to_cstr(Interpol i) {
 		switch(i) {

@@ -286,7 +286,7 @@ namespace BNN {
 			else break;
 		}
 		name = folder;
-		println("Message:  Loaded Network:", name);
+		if(log)println("Message:  Loaded Network:", name);
 		Compile(log);
 		return true;
 	}

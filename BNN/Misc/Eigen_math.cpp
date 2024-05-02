@@ -453,12 +453,11 @@ namespace BNN {
 	}
 	//tensor resize
 	void resize_r(TensRef y, const Tensor& x, Interpol filter) {
-		if(y.dim[0] != x.dimension(0) || y.dim[0] > CACHE_SIZE) return;
+		if(y.dim[0] != x.dimension(0)) return;
 		if(y.dim[1] == x.dimension(1) && y.dim[2] == x.dimension(2)) {
 			y.data = x;
 			return;
 		}
-		alignas(64) float tmp[CACHE_SIZE];
 		float s1 = y.dim[1] > 0 ? float(x.dimension(1)) / (y.dim[1]) : 0;
 		float s2 = y.dim[2] > 0 ? float(x.dimension(2)) / (y.dim[2]) : 0;
 		if(filter == Nearest) {
@@ -467,9 +466,8 @@ namespace BNN {
 				for(idx j = 0; j < y.dim[1]; j++) {
 					idx lj = (j + 0.5f) * s1;
 					for(idx k = 0; k < y.dim[0]; k++) {
-						tmp[k] = x(k, lj, li);
+						y(k, j, i) = x(k, lj, li);
 					}
-					memcpy(&y(0, j, i), tmp, y.dim[0] * sizeof(float));
 				}
 			}
 		}
@@ -477,31 +475,30 @@ namespace BNN {
 			for(idx i = 0; i < y.dim[2]; i++) {
 				float fi = fmaxf((i + 0.5f) * s2 - 0.5f, 0);
 				idx li = fi;
-				idx hi = min(li + 1, x.dimension(2) - 1);
+				idx hi = fminf(li + 1, x.dimension(2) - 1);
 				float wi = fi - li;
 				for(idx j = 0; j < y.dim[1]; j++) {
 					float fj = fmaxf((j + 0.5f) * s1 - 0.5f, 0);
 					idx lj = fj;
-					idx hj = min(lj + 1, x.dimension(1) - 1);
+					idx hj = fminf(lj + 1, x.dimension(1) - 1);
 					float wj = fj - lj;
 					for(idx k = 0; k < y.dim[0]; k++) {
 						float a = x(k, lj, li);
 						float b = x(k, hj, li);
 						float c = x(k, lj, hi);
 						float d = x(k, hj, hi);
-						tmp[k] = lerp(lerp(a, b, wj), lerp(c, d, wj), wi);
+						y(k, j, i) = lerp(lerp(a, b, wj), lerp(c, d, wj), wi);
 					}
-					memcpy(&y(0, j, i), tmp, y.dim[0] * sizeof(float));
 				}
 			}
 		}
 		else if(filter == Cubic) {
 			for(idx i = 0; i < y.dim[2]; i++) {
-				float yc = max((i + 0.5f) * s2 - 0.5f, 0.f);
+				float yc = fmaxf((i + 0.5f) * s2 - 0.5f, 0);
 				int y0 = yc;
 				float yd = yc - y0;
 				for(idx j = 0; j < y.dim[1]; j++) {
-					float xc = max((j + 0.5f) * s1 - 0.5f, 0.f);
+					float xc = fmaxf((j + 0.5f) * s1 - 0.5f, 0);
 					int x0 = xc;
 					float xd = xc - x0;
 					for(idx k = 0; k < y.dim[0]; k++) {
@@ -511,9 +508,31 @@ namespace BNN {
 								p[ii * 4 + jj] = x(k, clamp(x0 + jj - 1, 0, x.dimension(1) - 1), clamp(y0 + ii - 1, 0, x.dimension(2) - 1));
 							}
 						}
-						tmp[k] = clamp(bicerp(p, xd, yd), 0.f, 1.f);
+						y(k, j, i) = clamp(bicerp(p, xd, yd), 0.f, 1.f);
 					}
-					memcpy(&y(0, j, i), tmp, y.dim[0] * sizeof(float));
+				}
+			}
+		}
+		else if(filter == Lanczos) {
+			for(idx i = 0; i < y.dim[2]; i++) {
+				float yc = ((i + 0.5f) * s2 - 0.5f);
+				int y0 = yc;
+				float yd = yc - y0;
+				for(idx j = 0; j < y.dim[1]; j++) {
+					float xc = ((j + 0.5f) * s1 - 0.5f);
+					int x0 = xc;
+					float xd = xc - x0;
+					for(idx k = 0; k < y.dim[0]; k++) {
+						float res = 0;
+						for(int ii = -2; ii <= 3; ii++) {
+							for(int jj = -2; jj <= 3; jj++) {
+								float val = x(k, clamp(x0 + jj, 0, x.dimension(1) - 1), clamp(y0 + ii, 0, x.dimension(2) - 1));
+								res += val * lanc3(yd - ii) * lanc3(xd - jj);
+							}
+						}
+						y(k, j, i) = clamp(res, 0.f, 1.f);
+					}
+
 				}
 			}
 		}

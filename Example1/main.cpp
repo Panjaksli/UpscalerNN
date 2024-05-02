@@ -1,9 +1,13 @@
 #include "pch.h"
 using namespace BNN;
 // Tenarr(C,W,H,N) - (col major, channels are continuous)
-#if 1
+
 int main(int argc, char* argv[]) {
+	// Inference code
+#if 1
+	
 #if 0
+	// Either a IO program
 	//Inference code
 	NNet corr("corrective_cnn");
 	NNet upsc("upscaling_cnn");
@@ -12,14 +16,13 @@ int main(int argc, char* argv[]) {
 	while(1) {
 		print("Img path: "); std::cin >> img_name;
 		if(img_name == "exit") return 0;
-		//print("Output: "); std::cin >> outp;
 		print("Factor: "); std::cin >> fact;
 		Tensor in = Image(img_name, 3, 1).tensor_rgb(true);
 		if(in.size() == 0) { println("Invalid image!"); continue; }
 		if(fact <= 0) { fact = 1; }
 		Tensor out = corr.Compute_DS(in) + upsc.Compute_DS(in);
 		double actual = 2;
-		for(actual = 2; actual < fact; actual *= 2){
+		for(actual = 2; actual < fact; actual *= 2) {
 			out = corr.Compute_DS(out) + upsc.Compute_DS(out);
 		}
 		int ext = img_name.find_last_of(".");
@@ -27,9 +30,39 @@ int main(int argc, char* argv[]) {
 		Image(resize(in, fact, fact, BNN::Nearest)).save(img_name + "_nea.png");
 		Image(resize(in, fact, fact, BNN::Linear)).save(img_name + "_lin.png");
 		Image(resize(in, fact, fact, BNN::Cubic)).save(img_name + "_cub.png");
+		Image(resize(in, fact, fact, BNN::Lanczos)).save(img_name + "_lc3.png");
 		Image(resize(out, fact / actual, fact / actual, BNN::Cubic)).save(img_name + "_cnn.png");
-		
 	}
+	
+#else
+	// Or a CLI
+	NNet corr("corrective_cnn", 0);
+	NNet upsc("upscaling_cnn", 0);
+	if(argc == 1) {
+		println("No arguments provided !");
+		return -1;
+	}
+	if(!corr.Valid() || !upsc.Valid()) {
+		println("Could not find network files !");
+		return -1;
+	}
+	std::string img_name; 
+	constexpr double fact = 2;
+	for(int i = 1; i < argc; i++){
+		img_name = argv[i];
+		Tensor in = Image(img_name, 3, 0).tensor_rgb(true);
+		if(in.size() == 0) { continue; }
+		Tensor out = corr.Compute_DS(in) + upsc.Compute_DS(in);
+		int ext = img_name.find_last_of(".");
+		img_name = img_name.substr(0, ext);
+		Image(resize(in, fact, fact, BNN::Nearest)).save(img_name + "_nea.png");
+		Image(resize(in, fact, fact, BNN::Linear)).save(img_name + "_lin.png");
+		Image(resize(in, fact, fact, BNN::Cubic)).save(img_name + "_cub.png");
+		Image(resize(in, fact, fact, BNN::Lanczos)).save(img_name + "_lc3.png");
+		Image(out).save(img_name + "_cnn.png");
+	}
+#endif
+	// Training code
 #else
 	//Training code
 	constexpr idx factor = 2;
@@ -38,7 +71,7 @@ int main(int argc, char* argv[]) {
 	std::string parent = "Upscaler/";
 	//Input data
 	std::string in_folder = "Lowres/";
-	std::string net_folder = argc > 1 ? argv[1] : "c5x32_c3x32x3_2x";
+	std::string net_folder = argc > 1 ? argv[1] : "c5x32_c3x32x3_2x3";
 	idx epochs = argc > 2 ? atoi(argv[2]) : 20;
 	idx batch_sz = argc > 3 ? atoi(argv[3]) : 64;
 	float  lrate = argc > 4 ? atof(argv[4]) : 0.0003f;
@@ -94,54 +127,7 @@ int main(int argc, char* argv[]) {
 			Image(net.Compute(z.chip(j, 3)) + upscl.Compute(z.chip(j, 3))).save(netname + "/" + std::to_string(j) + ".png");
 		}
 		//net.Save_images(z);
-	}
+}
 #endif
 
 }
-#else
-	int main() {
-		int nch = 1;
-		int pa = 0;
-		int st = 2;
-		int ks = 2;
-		int sz = 4;
-		int osz = c_dim(sz, ks, st, pa);
-		Tensor x1(nch, sz, sz);
-		Tensor w1(nch * nch, ks, ks);
-		Tensor w2(nch * nch, ks, ks);
-		Tensor x2 = x1;
-		Tensor y(nch, osz, osz);
-		w1.setRandom();
-		x1.setRandom();
-		w2.setZero();
-		x2.setZero();
-		println("Testing forward");
-
-		convolve(y, x1, w1, st, pa);
-		printnp(y);
-		conv2d(y, x1, w1, st, pa);
-		printnp(y);
-		y.setConstant(1);
-		Tensor dy = y.inflate(dim1<3>{ 1, st, st });
-		println("Testing wgrad");
-		w2.setZero();
-		conv2d_wgrad(w2, x1, y, st, pa);
-		printnp(w2);
-		w2.setZero();
-		conv2d(w2, x1, dy, 1, pa);
-		printnp(w2);
-		w2.setZero();
-		acc_convolve(w2, x1, dy, 1, pa);
-		printnp(w2);
-
-		println("Testing igrad");
-		//printnp(x1);
-		conv2d_igrad(x2, y, w1, st, ks - pa - 1);
-		printnp(x2);
-		rev_convolve(x2, dy, w1, 1, ks - pa - 1);
-		printnp(x2);
-
-		
-	}
-
-#endif
